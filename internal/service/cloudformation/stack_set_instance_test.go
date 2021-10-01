@@ -21,11 +21,11 @@ import (
 func init() {
 	resource.AddTestSweepers("aws_cloudformation_stack_set_instance", &resource.Sweeper{
 		Name: "aws_cloudformation_stack_set_instance",
-		F:    testSweepCloudformationStackSetInstances,
+		F:    sweepStackSetInstances,
 	})
 }
 
-func testSweepCloudformationStackSetInstances(region string) error {
+func sweepStackSetInstances(region string) error {
 	client, err := sweep.SharedRegionalSweepClient(region)
 
 	if err != nil {
@@ -108,13 +108,13 @@ func TestAccAWSCloudFormationStackSetInstance_basic(t *testing.T) {
 	resourceName := "aws_cloudformation_stack_set_instance.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:     func() { acctest.PreCheck(t); testAccPreCheckAWSCloudFormationStackSet(t) },
+		PreCheck:     func() { acctest.PreCheck(t); testAccPreCheckStackSet(t) },
 		ErrorCheck:   acctest.ErrorCheck(t, cloudformation.EndpointsID),
 		Providers:    acctest.Providers,
-		CheckDestroy: testAccCheckAWSCloudFormationStackSetInstanceDestroy,
+		CheckDestroy: testAccCheckStackSetInstanceDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccAWSCloudFormationStackSetInstanceConfig(rName),
+				Config: testAccStackSetInstanceConfig(rName),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudFormationStackSetInstanceExists(resourceName, &stackInstance1),
 					acctest.CheckResourceAttrAccountID(resourceName, "account_id"),
@@ -143,13 +143,13 @@ func TestAccAWSCloudFormationStackSetInstance_disappears(t *testing.T) {
 	resourceName := "aws_cloudformation_stack_set_instance.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:     func() { acctest.PreCheck(t); testAccPreCheckAWSCloudFormationStackSet(t) },
+		PreCheck:     func() { acctest.PreCheck(t); testAccPreCheckStackSet(t) },
 		ErrorCheck:   acctest.ErrorCheck(t, cloudformation.EndpointsID),
 		Providers:    acctest.Providers,
-		CheckDestroy: testAccCheckAWSCloudFormationStackSetInstanceDestroy,
+		CheckDestroy: testAccCheckStackSetInstanceDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccAWSCloudFormationStackSetInstanceConfig(rName),
+				Config: testAccStackSetInstanceConfig(rName),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudFormationStackSetInstanceExists(resourceName, &stackInstance1),
 					acctest.CheckResourceDisappears(acctest.Provider, tfcloudformation.ResourceStackSetInstance(), resourceName),
@@ -168,13 +168,13 @@ func TestAccAWSCloudFormationStackSetInstance_disappears_StackSet(t *testing.T) 
 	resourceName := "aws_cloudformation_stack_set_instance.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:     func() { acctest.PreCheck(t); testAccPreCheckAWSCloudFormationStackSet(t) },
+		PreCheck:     func() { acctest.PreCheck(t); testAccPreCheckStackSet(t) },
 		ErrorCheck:   acctest.ErrorCheck(t, cloudformation.EndpointsID),
 		Providers:    acctest.Providers,
-		CheckDestroy: testAccCheckAWSCloudFormationStackSetInstanceDestroy,
+		CheckDestroy: testAccCheckStackSetInstanceDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccAWSCloudFormationStackSetInstanceConfig(rName),
+				Config: testAccStackSetInstanceConfig(rName),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudFormationStackSetExists(stackSetResourceName, &stackSet1),
 					testAccCheckCloudFormationStackSetInstanceExists(resourceName, &stackInstance1),
@@ -193,13 +193,13 @@ func TestAccAWSCloudFormationStackSetInstance_ParameterOverrides(t *testing.T) {
 	resourceName := "aws_cloudformation_stack_set_instance.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:     func() { acctest.PreCheck(t); testAccPreCheckAWSCloudFormationStackSet(t) },
+		PreCheck:     func() { acctest.PreCheck(t); testAccPreCheckStackSet(t) },
 		ErrorCheck:   acctest.ErrorCheck(t, cloudformation.EndpointsID),
 		Providers:    acctest.Providers,
-		CheckDestroy: testAccCheckAWSCloudFormationStackSetInstanceDestroy,
+		CheckDestroy: testAccCheckStackSetInstanceDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccAWSCloudFormationStackSetInstanceConfigParameterOverrides1(rName, "overridevalue1"),
+				Config: testAccStackSetInstanceParameterOverrides1Config(rName, "overridevalue1"),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudFormationStackSetInstanceExists(resourceName, &stackInstance1),
 					resource.TestCheckResourceAttr(resourceName, "parameter_overrides.%", "1"),
@@ -215,7 +215,7 @@ func TestAccAWSCloudFormationStackSetInstance_ParameterOverrides(t *testing.T) {
 				},
 			},
 			{
-				Config: testAccAWSCloudFormationStackSetInstanceConfigParameterOverrides2(rName, "overridevalue1updated", "overridevalue2"),
+				Config: testAccStackSetInstanceParameterOverrides2Config(rName, "overridevalue1updated", "overridevalue2"),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudFormationStackSetInstanceExists(resourceName, &stackInstance2),
 					testAccCheckCloudFormationStackSetInstanceNotRecreated(&stackInstance1, &stackInstance2),
@@ -225,7 +225,7 @@ func TestAccAWSCloudFormationStackSetInstance_ParameterOverrides(t *testing.T) {
 				),
 			},
 			{
-				Config: testAccAWSCloudFormationStackSetInstanceConfigParameterOverrides1(rName, "overridevalue1updated"),
+				Config: testAccStackSetInstanceParameterOverrides1Config(rName, "overridevalue1updated"),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudFormationStackSetInstanceExists(resourceName, &stackInstance3),
 					testAccCheckCloudFormationStackSetInstanceNotRecreated(&stackInstance2, &stackInstance3),
@@ -234,7 +234,7 @@ func TestAccAWSCloudFormationStackSetInstance_ParameterOverrides(t *testing.T) {
 				),
 			},
 			{
-				Config: testAccAWSCloudFormationStackSetInstanceConfig(rName),
+				Config: testAccStackSetInstanceConfig(rName),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudFormationStackSetInstanceExists(resourceName, &stackInstance4),
 					testAccCheckCloudFormationStackSetInstanceNotRecreated(&stackInstance3, &stackInstance4),
@@ -257,13 +257,13 @@ func TestAccAWSCloudFormationStackSetInstance_RetainStack(t *testing.T) {
 	resourceName := "aws_cloudformation_stack_set_instance.test"
 
 	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:     func() { acctest.PreCheck(t); testAccPreCheckAWSCloudFormationStackSet(t) },
+		PreCheck:     func() { acctest.PreCheck(t); testAccPreCheckStackSet(t) },
 		ErrorCheck:   acctest.ErrorCheck(t, cloudformation.EndpointsID),
 		Providers:    acctest.Providers,
-		CheckDestroy: testAccCheckAWSCloudFormationStackSetInstanceDestroy,
+		CheckDestroy: testAccCheckStackSetInstanceDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccAWSCloudFormationStackSetInstanceConfigRetainStack(rName, true),
+				Config: testAccStackSetInstanceRetainStackConfig(rName, true),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudFormationStackSetInstanceExists(resourceName, &stackInstance1),
 					resource.TestCheckResourceAttr(resourceName, "retain_stack", "true"),
@@ -278,7 +278,7 @@ func TestAccAWSCloudFormationStackSetInstance_RetainStack(t *testing.T) {
 				},
 			},
 			{
-				Config: testAccAWSCloudFormationStackSetInstanceConfigRetainStack(rName, false),
+				Config: testAccStackSetInstanceRetainStackConfig(rName, false),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudFormationStackSetInstanceExists(resourceName, &stackInstance2),
 					testAccCheckCloudFormationStackSetInstanceNotRecreated(&stackInstance1, &stackInstance2),
@@ -286,7 +286,7 @@ func TestAccAWSCloudFormationStackSetInstance_RetainStack(t *testing.T) {
 				),
 			},
 			{
-				Config: testAccAWSCloudFormationStackSetInstanceConfigRetainStack(rName, true),
+				Config: testAccStackSetInstanceRetainStackConfig(rName, true),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudFormationStackSetInstanceExists(resourceName, &stackInstance3),
 					testAccCheckCloudFormationStackSetInstanceNotRecreated(&stackInstance2, &stackInstance3),
@@ -294,7 +294,7 @@ func TestAccAWSCloudFormationStackSetInstance_RetainStack(t *testing.T) {
 				),
 			},
 			{
-				Config:  testAccAWSCloudFormationStackSetInstanceConfigRetainStack(rName, true),
+				Config:  testAccStackSetInstanceRetainStackConfig(rName, true),
 				Destroy: true,
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckCloudFormationStackSetInstanceStackExists(&stackInstance3, &stack1),
@@ -367,7 +367,7 @@ func testAccCheckCloudFormationStackSetInstanceStackExists(stackInstance *cloudf
 	}
 }
 
-func testAccCheckAWSCloudFormationStackSetInstanceDestroy(s *terraform.State) error {
+func testAccCheckStackSetInstanceDestroy(s *terraform.State) error {
 	conn := acctest.Provider.Meta().(*conns.AWSClient).CloudFormationConn
 
 	for _, rs := range s.RootModule().Resources {
@@ -419,7 +419,7 @@ func testAccCheckCloudFormationStackSetInstanceNotRecreated(i, j *cloudformation
 	}
 }
 
-func testAccAWSCloudFormationStackSetInstanceConfigBase(rName string) string {
+func testAccStackSetInstanceBaseConfig(rName string) string {
 	return fmt.Sprintf(`
 resource "aws_iam_role" "Administration" {
   assume_role_policy = <<EOF
@@ -549,8 +549,8 @@ TEMPLATE
 `, rName)
 }
 
-func testAccAWSCloudFormationStackSetInstanceConfig(rName string) string {
-	return testAccAWSCloudFormationStackSetInstanceConfigBase(rName) + `
+func testAccStackSetInstanceConfig(rName string) string {
+	return testAccStackSetInstanceBaseConfig(rName) + `
 resource "aws_cloudformation_stack_set_instance" "test" {
   depends_on = [aws_iam_role_policy.Administration, aws_iam_role_policy.Execution]
 
@@ -559,8 +559,8 @@ resource "aws_cloudformation_stack_set_instance" "test" {
 `
 }
 
-func testAccAWSCloudFormationStackSetInstanceConfigParameterOverrides1(rName, value1 string) string {
-	return testAccAWSCloudFormationStackSetInstanceConfigBase(rName) + fmt.Sprintf(`
+func testAccStackSetInstanceParameterOverrides1Config(rName, value1 string) string {
+	return testAccStackSetInstanceBaseConfig(rName) + fmt.Sprintf(`
 resource "aws_cloudformation_stack_set_instance" "test" {
   depends_on = [aws_iam_role_policy.Administration, aws_iam_role_policy.Execution]
 
@@ -573,8 +573,8 @@ resource "aws_cloudformation_stack_set_instance" "test" {
 `, value1)
 }
 
-func testAccAWSCloudFormationStackSetInstanceConfigParameterOverrides2(rName, value1, value2 string) string {
-	return testAccAWSCloudFormationStackSetInstanceConfigBase(rName) + fmt.Sprintf(`
+func testAccStackSetInstanceParameterOverrides2Config(rName, value1, value2 string) string {
+	return testAccStackSetInstanceBaseConfig(rName) + fmt.Sprintf(`
 resource "aws_cloudformation_stack_set_instance" "test" {
   depends_on = [aws_iam_role_policy.Administration, aws_iam_role_policy.Execution]
 
@@ -588,8 +588,8 @@ resource "aws_cloudformation_stack_set_instance" "test" {
 `, value1, value2)
 }
 
-func testAccAWSCloudFormationStackSetInstanceConfigRetainStack(rName string, retainStack bool) string {
-	return testAccAWSCloudFormationStackSetInstanceConfigBase(rName) + fmt.Sprintf(`
+func testAccStackSetInstanceRetainStackConfig(rName string, retainStack bool) string {
+	return testAccStackSetInstanceBaseConfig(rName) + fmt.Sprintf(`
 resource "aws_cloudformation_stack_set_instance" "test" {
   depends_on = [aws_iam_role_policy.Administration, aws_iam_role_policy.Execution]
 
