@@ -20,10 +20,6 @@ import (
 	"github.com/hashicorp/terraform-provider-aws/internal/sweep"
 )
 
-
-
-
-
 func TestAccRDSEventSubscription_basicUpdate(t *testing.T) {
 	var v rds.EventSubscription
 	rInt := sdkacctest.RandInt()
