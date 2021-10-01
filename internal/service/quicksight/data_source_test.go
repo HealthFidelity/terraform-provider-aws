@@ -467,7 +467,7 @@ func testAccCheckQuickSightDataSourceExists(resourceName string, dataSource *qui
 			return fmt.Errorf("Not found: %s", resourceName)
 		}
 
-		awsAccountID, dataSourceId, err := resourceAwsQuickSightDataSourceParseID(rs.Primary.ID)
+		awsAccountID, dataSourceId, err := resourceParseIDDataSource(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
@@ -502,7 +502,7 @@ func testAccCheckQuickSightDataSourceDestroy(s *terraform.State) error {
 			continue
 		}
 
-		awsAccountID, dataSourceId, err := resourceAwsQuickSightDataSourceParseID(rs.Primary.ID)
+		awsAccountID, dataSourceId, err := resourceParseIDDataSource(rs.Primary.ID)
 		if err != nil {
 			return err
 		}
