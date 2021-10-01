@@ -82,7 +82,7 @@ func sweepEventSubscriptions(region string) error {
 	return sweeperErrs.ErrorOrNil()
 }
 
-func TestAccAWSDBEventSubscription_basicUpdate(t *testing.T) {
+func TestAccRDSEventSubscription_basicUpdate(t *testing.T) {
 	var v rds.EventSubscription
 	rInt := sdkacctest.RandInt()
 	resourceName := "aws_db_event_subscription.test"
@@ -126,7 +126,7 @@ func TestAccAWSDBEventSubscription_basicUpdate(t *testing.T) {
 	})
 }
 
-func TestAccAWSDBEventSubscription_disappears(t *testing.T) {
+func TestAccRDSEventSubscription_disappears(t *testing.T) {
 	var eventSubscription rds.EventSubscription
 	rInt := sdkacctest.RandInt()
 	resourceName := "aws_db_event_subscription.test"
@@ -149,7 +149,7 @@ func TestAccAWSDBEventSubscription_disappears(t *testing.T) {
 	})
 }
 
-func TestAccAWSDBEventSubscription_withPrefix(t *testing.T) {
+func TestAccRDSEventSubscription_withPrefix(t *testing.T) {
 	var v rds.EventSubscription
 	rInt := sdkacctest.RandInt()
 	startsWithPrefix := regexp.MustCompile("^tf-acc-test-rds-event-subs-")
@@ -175,7 +175,7 @@ func TestAccAWSDBEventSubscription_withPrefix(t *testing.T) {
 	})
 }
 
-func TestAccAWSDBEventSubscription_withSourceIds(t *testing.T) {
+func TestAccRDSEventSubscription_withSourceIDs(t *testing.T) {
 	var v rds.EventSubscription
 	rInt := sdkacctest.RandInt()
 	resourceName := "aws_db_event_subscription.test"
@@ -217,7 +217,7 @@ func TestAccAWSDBEventSubscription_withSourceIds(t *testing.T) {
 	})
 }
 
-func TestAccAWSDBEventSubscription_categoryUpdate(t *testing.T) {
+func TestAccRDSEventSubscription_categoryUpdate(t *testing.T) {
 	var v rds.EventSubscription
 	rInt := sdkacctest.RandInt()
 	resourceName := "aws_db_event_subscription.test"
