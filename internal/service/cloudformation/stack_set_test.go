@@ -19,60 +19,9 @@ import (
 	"github.com/hashicorp/terraform-provider-aws/internal/sweep"
 )
 
-func init() {
-	resource.AddTestSweepers("aws_cloudformation_stack_set", &resource.Sweeper{
-		Name: "aws_cloudformation_stack_set",
-		Dependencies: []string{
-			"aws_cloudformation_stack_set_instance",
-		},
-		F: sweepStackSets,
-	})
-}
 
-func sweepStackSets(region string) error {
-	client, err := sweep.SharedRegionalSweepClient(region)
 
-	if err != nil {
-		return fmt.Errorf("error getting client: %w", err)
-	}
 
-	conn := client.(*conns.AWSClient).CloudFormationConn
-	stackSets, err := tfcloudformation.ListStackSets(conn)
-
-	if sweep.SkipSweepError(err) || tfawserr.ErrMessageContains(err, "ValidationError", "AWS CloudFormation StackSets is not supported") {
-		log.Printf("[WARN] Skipping CloudFormation StackSet sweep for %s: %s", region, err)
-		return nil
-	}
-
-	if err != nil {
-		return fmt.Errorf("error listing CloudFormation StackSets: %w", err)
-	}
-
-	var sweeperErrs *multierror.Error
-
-	for _, stackSet := range stackSets {
-		input := &cloudformation.DeleteStackSetInput{
-			StackSetName: stackSet.StackSetName,
-		}
-		name := aws.StringValue(stackSet.StackSetName)
-
-		log.Printf("[INFO] Deleting CloudFormation StackSet: %s", name)
-		_, err := conn.DeleteStackSet(input)
-
-		if tfawserr.ErrMessageContains(err, cloudformation.ErrCodeStackSetNotFoundException, "") {
-			continue
-		}
-
-		if err != nil {
-			sweeperErr := fmt.Errorf("error deleting CloudFormation StackSet (%s): %w", name, err)
-			log.Printf("[ERROR] %s", sweeperErr)
-			sweeperErrs = multierror.Append(sweeperErrs, sweeperErr)
-			continue
-		}
-	}
-
-	return sweeperErrs.ErrorOrNil()
-}
 
 func TestAccCloudFormationStackSet_basic(t *testing.T) {
 	var stackSet1 cloudformation.StackSet
