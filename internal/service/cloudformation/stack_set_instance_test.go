@@ -101,7 +101,7 @@ func sweepStackSetInstances(region string) error {
 	return sweeperErrs.ErrorOrNil()
 }
 
-func TestAccAWSCloudFormationStackSetInstance_basic(t *testing.T) {
+func TestAccCloudFormationStackSetInstance_basic(t *testing.T) {
 	var stackInstance1 cloudformation.StackInstance
 	rName := sdkacctest.RandomWithPrefix("tf-acc-test")
 	cloudformationStackSetResourceName := "aws_cloudformation_stack_set.test"
@@ -137,7 +137,7 @@ func TestAccAWSCloudFormationStackSetInstance_basic(t *testing.T) {
 	})
 }
 
-func TestAccAWSCloudFormationStackSetInstance_disappears(t *testing.T) {
+func TestAccCloudFormationStackSetInstance_disappears(t *testing.T) {
 	var stackInstance1 cloudformation.StackInstance
 	rName := sdkacctest.RandomWithPrefix("tf-acc-test")
 	resourceName := "aws_cloudformation_stack_set_instance.test"
@@ -160,7 +160,7 @@ func TestAccAWSCloudFormationStackSetInstance_disappears(t *testing.T) {
 	})
 }
 
-func TestAccAWSCloudFormationStackSetInstance_disappears_StackSet(t *testing.T) {
+func TestAccCloudFormationStackSetInstance_Disappears_stackSet(t *testing.T) {
 	var stackInstance1 cloudformation.StackInstance
 	var stackSet1 cloudformation.StackSet
 	rName := sdkacctest.RandomWithPrefix("tf-acc-test")
@@ -187,7 +187,7 @@ func TestAccAWSCloudFormationStackSetInstance_disappears_StackSet(t *testing.T) 
 	})
 }
 
-func TestAccAWSCloudFormationStackSetInstance_ParameterOverrides(t *testing.T) {
+func TestAccCloudFormationStackSetInstance_parameterOverrides(t *testing.T) {
 	var stackInstance1, stackInstance2, stackInstance3, stackInstance4 cloudformation.StackInstance
 	rName := sdkacctest.RandomWithPrefix("tf-acc-test")
 	resourceName := "aws_cloudformation_stack_set_instance.test"
@@ -250,7 +250,7 @@ func TestAccAWSCloudFormationStackSetInstance_ParameterOverrides(t *testing.T) {
 //  * Trigger a Terraform destroy of the resource, which should only remove the instance from the StackSet
 //  * Check it still exists outside Terraform
 //  * Destroy for real outside Terraform
-func TestAccAWSCloudFormationStackSetInstance_RetainStack(t *testing.T) {
+func TestAccCloudFormationStackSetInstance_retainStack(t *testing.T) {
 	var stack1 cloudformation.Stack
 	var stackInstance1, stackInstance2, stackInstance3 cloudformation.StackInstance
 	rName := sdkacctest.RandomWithPrefix("tf-acc-test")
