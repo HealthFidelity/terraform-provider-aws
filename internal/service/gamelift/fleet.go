@@ -8,7 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/gamelift"
-	"github.com/hashicorp/aws-sdk-go-base/tfawserr"
+	"github.com/hashicorp/aws-sdk-go-base/v2/awsv1shim/v2/tfawserr"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -20,6 +20,11 @@ import (
 	"github.com/hashicorp/terraform-provider-aws/internal/verify"
 )
 
+const (
+	fleetCreatedDefaultTimeout = 70 * time.Minute
+	FleetDeletedDefaultTimeout = 20 * time.Minute
+)
+
 func ResourceFleet() *schema.Resource {
 	return &schema.Resource{
 		Create: resourceFleetCreate,
@@ -28,8 +33,8 @@ func ResourceFleet() *schema.Resource {
 		Delete: resourceFleetDelete,
 
 		Timeouts: &schema.ResourceTimeout{
-			Create: schema.DefaultTimeout(70 * time.Minute),
-			Delete: schema.DefaultTimeout(20 * time.Minute),
+			Create: schema.DefaultTimeout(fleetCreatedDefaultTimeout),
+			Delete: schema.DefaultTimeout(FleetDeletedDefaultTimeout),
 		},
 
 		Schema: map[string]*schema.Schema{
@@ -648,7 +653,7 @@ func isGameliftEventFailure(event *gamelift.Event) bool {
 		gamelift.EventCodeServerProcessTerminatedUnhealthy,
 	}
 	for _, fc := range failureCodes {
-		if *event.EventCode == fc {
+		if aws.StringValue(event.EventCode) == fc {
 			return true
 		}
 	}

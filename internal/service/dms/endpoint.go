@@ -10,7 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	dms "github.com/aws/aws-sdk-go/service/databasemigrationservice"
-	"github.com/hashicorp/aws-sdk-go-base/tfawserr"
+	"github.com/hashicorp/aws-sdk-go-base/v2/awsv1shim/v2/tfawserr"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -218,11 +218,42 @@ func ResourceEndpoint() *schema.Resource {
 				DiffSuppressFunc: verify.SuppressMissingOptionalConfigurationBlock,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
+						"include_control_details": {
+							Type:     schema.TypeBool,
+							Optional: true,
+							Default:  false,
+						},
+						"include_null_and_empty": {
+							Type:     schema.TypeBool,
+							Optional: true,
+							Default:  false,
+						},
+						"include_partition_value": {
+							Type:     schema.TypeBool,
+							Optional: true,
+							Default:  false,
+						},
+						"include_table_alter_operations": {
+							Type:     schema.TypeBool,
+							Optional: true,
+							Default:  false,
+						},
+						"include_transaction_details": {
+							Type:     schema.TypeBool,
+							Optional: true,
+							Default:  false,
+						},
 						"message_format": {
 							Type:         schema.TypeString,
 							Optional:     true,
+							ForceNew:     true,
 							Default:      dms.MessageFormatValueJson,
 							ValidateFunc: validation.StringInSlice(dms.MessageFormatValue_Values(), false),
+						},
+						"partition_include_schema_table": {
+							Type:     schema.TypeBool,
+							Optional: true,
+							Default:  false,
 						},
 						"service_access_role_arn": {
 							Type:         schema.TypeString,
@@ -288,13 +319,15 @@ func ResourceEndpoint() *schema.Resource {
 				},
 			},
 			"password": {
-				Type:      schema.TypeString,
-				Optional:  true,
-				Sensitive: true,
+				Type:          schema.TypeString,
+				Optional:      true,
+				Sensitive:     true,
+				ConflictsWith: []string{"secrets_manager_access_role_arn", "secrets_manager_arn"},
 			},
 			"port": {
-				Type:     schema.TypeInt,
-				Optional: true,
+				Type:          schema.TypeInt,
+				Optional:      true,
+				ConflictsWith: []string{"secrets_manager_access_role_arn", "secrets_manager_arn"},
 			},
 			"s3_settings": {
 				Type:             schema.TypeList,
@@ -375,9 +408,24 @@ func ResourceEndpoint() *schema.Resource {
 					},
 				},
 			},
+			"secrets_manager_access_role_arn": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ValidateFunc:  verify.ValidARN,
+				RequiredWith:  []string{"secrets_manager_arn"},
+				ConflictsWith: []string{"username", "password", "server_name", "port"},
+			},
+			"secrets_manager_arn": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ValidateFunc:  verify.ValidARN,
+				RequiredWith:  []string{"secrets_manager_access_role_arn"},
+				ConflictsWith: []string{"username", "password", "server_name", "port"},
+			},
 			"server_name": {
-				Type:     schema.TypeString,
-				Optional: true,
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"secrets_manager_access_role_arn", "secrets_manager_arn"},
 			},
 			"service_access_role": {
 				Type:     schema.TypeString,
@@ -392,8 +440,9 @@ func ResourceEndpoint() *schema.Resource {
 			"tags":     tftags.TagsSchema(),
 			"tags_all": tftags.TagsSchemaComputed(),
 			"username": {
-				Type:     schema.TypeString,
-				Optional: true,
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"secrets_manager_access_role_arn", "secrets_manager_arn"},
 			},
 		},
 
@@ -421,7 +470,7 @@ func resourceEndpointCreate(d *schema.ResourceData, meta interface{}) error {
 		request.DynamoDbSettings = &dms.DynamoDbSettings{
 			ServiceAccessRoleArn: aws.String(d.Get("service_access_role").(string)),
 		}
-	case engineNameElasticSearch:
+	case engineNameElasticsearch:
 		request.ElasticsearchSettings = &dms.ElasticsearchSettings{
 			ServiceAccessRoleArn:    aws.String(d.Get("elasticsearch_settings.0.service_access_role_arn").(string)),
 			EndpointUri:             aws.String(d.Get("elasticsearch_settings.0.endpoint_uri").(string)),
@@ -431,11 +480,7 @@ func resourceEndpointCreate(d *schema.ResourceData, meta interface{}) error {
 	case engineNameKafka:
 		request.KafkaSettings = expandDmsKafkaSettings(d.Get("kafka_settings").([]interface{})[0].(map[string]interface{}))
 	case engineNameKinesis:
-		request.KinesisSettings = &dms.KinesisSettings{
-			MessageFormat:        aws.String(d.Get("kinesis_settings.0.message_format").(string)),
-			ServiceAccessRoleArn: aws.String(d.Get("kinesis_settings.0.service_access_role_arn").(string)),
-			StreamArn:            aws.String(d.Get("kinesis_settings.0.stream_arn").(string)),
-		}
+		request.KinesisSettings = expandDmsKinesisSettings(d.Get("kinesis_settings").([]interface{})[0].(map[string]interface{}))
 	case engineNameMongodb:
 		request.MongoDbSettings = &dms.MongoDbSettings{
 			Username:     aws.String(d.Get("username").(string)),
@@ -459,6 +504,52 @@ func resourceEndpointCreate(d *schema.ResourceData, meta interface{}) error {
 		request.ServerName = aws.String(d.Get("server_name").(string))
 		request.Port = aws.Int64(int64(d.Get("port").(int)))
 		request.DatabaseName = aws.String(d.Get("database_name").(string))
+	case engineNameOracle:
+		if _, ok := d.GetOk("secrets_manager_arn"); ok {
+			request.OracleSettings = &dms.OracleSettings{
+				SecretsManagerAccessRoleArn: aws.String(d.Get("secrets_manager_access_role_arn").(string)),
+				SecretsManagerSecretId:      aws.String(d.Get("secrets_manager_arn").(string)),
+				DatabaseName:                aws.String(d.Get("database_name").(string)),
+			}
+		} else {
+			request.OracleSettings = &dms.OracleSettings{
+				Username:     aws.String(d.Get("username").(string)),
+				Password:     aws.String(d.Get("password").(string)),
+				ServerName:   aws.String(d.Get("server_name").(string)),
+				Port:         aws.Int64(int64(d.Get("port").(int))),
+				DatabaseName: aws.String(d.Get("database_name").(string)),
+			}
+
+			// Set connection info in top-level namespace as well
+			request.Username = aws.String(d.Get("username").(string))
+			request.Password = aws.String(d.Get("password").(string))
+			request.ServerName = aws.String(d.Get("server_name").(string))
+			request.Port = aws.Int64(int64(d.Get("port").(int)))
+			request.DatabaseName = aws.String(d.Get("database_name").(string))
+		}
+	case engineNamePostgres:
+		if _, ok := d.GetOk("secrets_manager_arn"); ok {
+			request.PostgreSQLSettings = &dms.PostgreSQLSettings{
+				SecretsManagerAccessRoleArn: aws.String(d.Get("secrets_manager_access_role_arn").(string)),
+				SecretsManagerSecretId:      aws.String(d.Get("secrets_manager_arn").(string)),
+				DatabaseName:                aws.String(d.Get("database_name").(string)),
+			}
+		} else {
+			request.PostgreSQLSettings = &dms.PostgreSQLSettings{
+				Username:     aws.String(d.Get("username").(string)),
+				Password:     aws.String(d.Get("password").(string)),
+				ServerName:   aws.String(d.Get("server_name").(string)),
+				Port:         aws.Int64(int64(d.Get("port").(int))),
+				DatabaseName: aws.String(d.Get("database_name").(string)),
+			}
+
+			// Set connection info in top-level namespace as well
+			request.Username = aws.String(d.Get("username").(string))
+			request.Password = aws.String(d.Get("password").(string))
+			request.ServerName = aws.String(d.Get("server_name").(string))
+			request.Port = aws.Int64(int64(d.Get("port").(int)))
+			request.DatabaseName = aws.String(d.Get("database_name").(string))
+		}
 	case engineNameS3:
 		request.S3Settings = &dms.S3Settings{
 			BucketFolder:                  aws.String(d.Get("s3_settings.0.bucket_folder").(string)),
@@ -634,7 +725,7 @@ func resourceEndpointUpdate(d *schema.ResourceData, meta interface{}) error {
 			}
 			hasChanges = true
 		}
-	case engineNameElasticSearch:
+	case engineNameElasticsearch:
 		if d.HasChanges(
 			"elasticsearch_settings.0.endpoint_uri",
 			"elasticsearch_settings.0.error_retry_duration",
@@ -656,16 +747,8 @@ func resourceEndpointUpdate(d *schema.ResourceData, meta interface{}) error {
 			hasChanges = true
 		}
 	case engineNameKinesis:
-		if d.HasChanges(
-			"kinesis_settings.0.service_access_role_arn",
-			"kinesis_settings.0.stream_arn") {
-			// Intentionally omitting MessageFormat, because it's rejected on ModifyEndpoint calls.
-			// "An error occurred (InvalidParameterValueException) when calling the ModifyEndpoint
-			// operation: Message format  cannot be modified for kinesis endpoints."
-			request.KinesisSettings = &dms.KinesisSettings{
-				ServiceAccessRoleArn: aws.String(d.Get("kinesis_settings.0.service_access_role_arn").(string)),
-				StreamArn:            aws.String(d.Get("kinesis_settings.0.stream_arn").(string)),
-			}
+		if d.HasChanges("kinesis_settings") {
+			request.KinesisSettings = expandDmsKinesisSettings(d.Get("kinesis_settings").([]interface{})[0].(map[string]interface{}))
 			request.EngineName = aws.String(engineName)
 			hasChanges = true
 		}
@@ -698,6 +781,64 @@ func resourceEndpointUpdate(d *schema.ResourceData, meta interface{}) error {
 			request.Port = aws.Int64(int64(d.Get("port").(int)))
 			request.DatabaseName = aws.String(d.Get("database_name").(string))
 
+			hasChanges = true
+		}
+	case engineNameOracle:
+		if d.HasChanges(
+			"username", "password", "server_name", "port", "database_name", "secrets_manager_access_role_arn",
+			"secrets_manager_arn") {
+			if _, ok := d.GetOk("secrets_manager_arn"); ok {
+				request.OracleSettings = &dms.OracleSettings{
+					DatabaseName:                aws.String(d.Get("database_name").(string)),
+					SecretsManagerAccessRoleArn: aws.String(d.Get("secrets_manager_access_role_arn").(string)),
+					SecretsManagerSecretId:      aws.String(d.Get("secrets_manager_arn").(string)),
+				}
+			} else {
+				request.OracleSettings = &dms.OracleSettings{
+					Username:     aws.String(d.Get("username").(string)),
+					Password:     aws.String(d.Get("password").(string)),
+					ServerName:   aws.String(d.Get("server_name").(string)),
+					Port:         aws.Int64(int64(d.Get("port").(int))),
+					DatabaseName: aws.String(d.Get("database_name").(string)),
+				}
+				request.EngineName = aws.String(d.Get("engine_name").(string)) // Must be included (should be 'oracle')
+
+				// Update connection info in top-level namespace as well
+				request.Username = aws.String(d.Get("username").(string))
+				request.Password = aws.String(d.Get("password").(string))
+				request.ServerName = aws.String(d.Get("server_name").(string))
+				request.Port = aws.Int64(int64(d.Get("port").(int)))
+				request.DatabaseName = aws.String(d.Get("database_name").(string))
+			}
+			hasChanges = true
+		}
+	case engineNamePostgres:
+		if d.HasChanges(
+			"username", "password", "server_name", "port", "database_name", "secrets_manager_access_role_arn",
+			"secrets_manager_arn") {
+			if _, ok := d.GetOk("secrets_manager_arn"); ok {
+				request.PostgreSQLSettings = &dms.PostgreSQLSettings{
+					DatabaseName:                aws.String(d.Get("database_name").(string)),
+					SecretsManagerAccessRoleArn: aws.String(d.Get("secrets_manager_access_role_arn").(string)),
+					SecretsManagerSecretId:      aws.String(d.Get("secrets_manager_arn").(string)),
+				}
+			} else {
+				request.PostgreSQLSettings = &dms.PostgreSQLSettings{
+					Username:     aws.String(d.Get("username").(string)),
+					Password:     aws.String(d.Get("password").(string)),
+					ServerName:   aws.String(d.Get("server_name").(string)),
+					Port:         aws.Int64(int64(d.Get("port").(int))),
+					DatabaseName: aws.String(d.Get("database_name").(string)),
+				}
+				request.EngineName = aws.String(d.Get("engine_name").(string)) // Must be included (should be 'postgres')
+
+				// Update connection info in top-level namespace as well
+				request.Username = aws.String(d.Get("username").(string))
+				request.Password = aws.String(d.Get("password").(string))
+				request.ServerName = aws.String(d.Get("server_name").(string))
+				request.Port = aws.Int64(int64(d.Get("port").(int)))
+				request.DatabaseName = aws.String(d.Get("database_name").(string))
+			}
 			hasChanges = true
 		}
 	case engineNameS3:
@@ -792,7 +933,7 @@ func resourceEndpointDelete(d *schema.ResourceData, meta interface{}) error {
 
 func resourceEndpointCustomizeDiff(_ context.Context, diff *schema.ResourceDiff, v interface{}) error {
 	switch engineName := diff.Get("engine_name").(string); engineName {
-	case engineNameElasticSearch:
+	case engineNameElasticsearch:
 		if v, ok := diff.GetOk("elasticsearch_settings"); !ok || len(v.([]interface{})) == 0 || v.([]interface{})[0] == nil {
 			return fmt.Errorf("elasticsearch_settings must be set when engine_name = %q", engineName)
 		}
@@ -828,18 +969,18 @@ func resourceEndpointSetState(d *schema.ResourceData, endpoint *dms.Endpoint) er
 	d.Set("engine_name", endpoint.EngineName)
 	d.Set("extra_connection_attributes", endpoint.ExtraConnectionAttributes)
 
-	switch *endpoint.EngineName {
-	case "dynamodb":
+	switch aws.StringValue(endpoint.EngineName) {
+	case engineNameDynamoDB:
 		if endpoint.DynamoDbSettings != nil {
 			d.Set("service_access_role", endpoint.DynamoDbSettings.ServiceAccessRoleArn)
 		} else {
 			d.Set("service_access_role", "")
 		}
-	case "elasticsearch":
+	case engineNameElasticsearch:
 		if err := d.Set("elasticsearch_settings", flattenDmsElasticsearchSettings(endpoint.ElasticsearchSettings)); err != nil {
 			return fmt.Errorf("Error setting elasticsearch for DMS: %s", err)
 		}
-	case "kafka":
+	case engineNameKafka:
 		if endpoint.KafkaSettings != nil {
 			// SASL password isn't returned in API. Propagate state value.
 			tfMap := flattenDmsKafkaSettings(endpoint.KafkaSettings)
@@ -851,11 +992,11 @@ func resourceEndpointSetState(d *schema.ResourceData, endpoint *dms.Endpoint) er
 		} else {
 			d.Set("kafka_settings", nil)
 		}
-	case "kinesis":
-		if err := d.Set("kinesis_settings", flattenDmsKinesisSettings(endpoint.KinesisSettings)); err != nil {
-			return fmt.Errorf("Error setting kinesis_settings for DMS: %s", err)
+	case engineNameKinesis:
+		if err := d.Set("kinesis_settings", []interface{}{flattenDmsKinesisSettings(endpoint.KinesisSettings)}); err != nil {
+			return fmt.Errorf("error setting kinesis_settings: %w", err)
 		}
-	case "mongodb":
+	case engineNameMongodb:
 		if endpoint.MongoDbSettings != nil {
 			d.Set("username", endpoint.MongoDbSettings.Username)
 			d.Set("server_name", endpoint.MongoDbSettings.ServerName)
@@ -870,7 +1011,35 @@ func resourceEndpointSetState(d *schema.ResourceData, endpoint *dms.Endpoint) er
 		if err := d.Set("mongodb_settings", flattenDmsMongoDbSettings(endpoint.MongoDbSettings)); err != nil {
 			return fmt.Errorf("Error setting mongodb_settings for DMS: %s", err)
 		}
-	case "s3":
+	case engineNameOracle:
+		if endpoint.OracleSettings != nil {
+			d.Set("username", endpoint.OracleSettings.Username)
+			d.Set("server_name", endpoint.OracleSettings.ServerName)
+			d.Set("port", endpoint.OracleSettings.Port)
+			d.Set("database_name", endpoint.OracleSettings.DatabaseName)
+			d.Set("secrets_manager_access_role_arn", endpoint.OracleSettings.SecretsManagerAccessRoleArn)
+			d.Set("secrets_manager_arn", endpoint.OracleSettings.SecretsManagerSecretId)
+		} else {
+			d.Set("username", endpoint.Username)
+			d.Set("server_name", endpoint.ServerName)
+			d.Set("port", endpoint.Port)
+			d.Set("database_name", endpoint.DatabaseName)
+		}
+	case engineNamePostgres:
+		if endpoint.PostgreSQLSettings != nil {
+			d.Set("username", endpoint.PostgreSQLSettings.Username)
+			d.Set("server_name", endpoint.PostgreSQLSettings.ServerName)
+			d.Set("port", endpoint.PostgreSQLSettings.Port)
+			d.Set("database_name", endpoint.PostgreSQLSettings.DatabaseName)
+			d.Set("secrets_manager_access_role_arn", endpoint.PostgreSQLSettings.SecretsManagerAccessRoleArn)
+			d.Set("secrets_manager_arn", endpoint.PostgreSQLSettings.SecretsManagerSecretId)
+		} else {
+			d.Set("username", endpoint.Username)
+			d.Set("server_name", endpoint.ServerName)
+			d.Set("port", endpoint.Port)
+			d.Set("database_name", endpoint.DatabaseName)
+		}
+	case engineNameS3:
 		if err := d.Set("s3_settings", flattenDmsS3Settings(endpoint.S3Settings)); err != nil {
 			return fmt.Errorf("Error setting s3_settings for DMS: %s", err)
 		}
@@ -1067,18 +1236,96 @@ func flattenDmsKafkaSettings(apiObject *dms.KafkaSettings) map[string]interface{
 	return tfMap
 }
 
-func flattenDmsKinesisSettings(settings *dms.KinesisSettings) []map[string]interface{} {
-	if settings == nil {
-		return []map[string]interface{}{}
+func expandDmsKinesisSettings(tfMap map[string]interface{}) *dms.KinesisSettings {
+	if tfMap == nil {
+		return nil
 	}
 
-	m := map[string]interface{}{
-		"message_format":          aws.StringValue(settings.MessageFormat),
-		"service_access_role_arn": aws.StringValue(settings.ServiceAccessRoleArn),
-		"stream_arn":              aws.StringValue(settings.StreamArn),
+	apiObject := &dms.KinesisSettings{}
+
+	if v, ok := tfMap["include_control_details"].(bool); ok {
+		apiObject.IncludeControlDetails = aws.Bool(v)
 	}
 
-	return []map[string]interface{}{m}
+	if v, ok := tfMap["include_null_and_empty"].(bool); ok {
+		apiObject.IncludeNullAndEmpty = aws.Bool(v)
+	}
+
+	if v, ok := tfMap["include_partition_value"].(bool); ok {
+		apiObject.IncludePartitionValue = aws.Bool(v)
+	}
+
+	if v, ok := tfMap["include_table_alter_operations"].(bool); ok {
+		apiObject.IncludeTableAlterOperations = aws.Bool(v)
+	}
+
+	if v, ok := tfMap["include_transaction_details"].(bool); ok {
+		apiObject.IncludeTransactionDetails = aws.Bool(v)
+	}
+
+	if v, ok := tfMap["message_format"].(string); ok && v != "" {
+		apiObject.MessageFormat = aws.String(v)
+	}
+
+	if v, ok := tfMap["partition_include_schema_table"].(bool); ok {
+		apiObject.PartitionIncludeSchemaTable = aws.Bool(v)
+	}
+
+	if v, ok := tfMap["service_access_role_arn"].(string); ok && v != "" {
+		apiObject.ServiceAccessRoleArn = aws.String(v)
+	}
+
+	if v, ok := tfMap["stream_arn"].(string); ok && v != "" {
+		apiObject.StreamArn = aws.String(v)
+	}
+
+	return apiObject
+}
+
+func flattenDmsKinesisSettings(apiObject *dms.KinesisSettings) map[string]interface{} {
+	if apiObject == nil {
+		return nil
+	}
+
+	tfMap := map[string]interface{}{}
+
+	if v := apiObject.IncludeControlDetails; v != nil {
+		tfMap["include_control_details"] = aws.BoolValue(v)
+	}
+
+	if v := apiObject.IncludeNullAndEmpty; v != nil {
+		tfMap["include_null_and_empty"] = aws.BoolValue(v)
+	}
+
+	if v := apiObject.IncludePartitionValue; v != nil {
+		tfMap["include_partition_value"] = aws.BoolValue(v)
+	}
+
+	if v := apiObject.IncludeTableAlterOperations; v != nil {
+		tfMap["include_table_alter_operations"] = aws.BoolValue(v)
+	}
+
+	if v := apiObject.IncludeTransactionDetails; v != nil {
+		tfMap["include_transaction_details"] = aws.BoolValue(v)
+	}
+
+	if v := apiObject.MessageFormat; v != nil {
+		tfMap["message_format"] = aws.StringValue(v)
+	}
+
+	if v := apiObject.PartitionIncludeSchemaTable; v != nil {
+		tfMap["partition_include_schema_table"] = aws.BoolValue(v)
+	}
+
+	if v := apiObject.ServiceAccessRoleArn; v != nil {
+		tfMap["service_access_role_arn"] = aws.StringValue(v)
+	}
+
+	if v := apiObject.StreamArn; v != nil {
+		tfMap["stream_arn"] = aws.StringValue(v)
+	}
+
+	return tfMap
 }
 
 func flattenDmsMongoDbSettings(settings *dms.MongoDbSettings) []map[string]interface{} {

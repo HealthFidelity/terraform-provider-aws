@@ -63,6 +63,8 @@ The following arguments are supported:
 * `password` - (Optional) The password to be used to login to the endpoint database.
 * `port` - (Optional) The port used by the endpoint database.
 * `s3_settings` - (Optional) Configuration block with S3 settings. Detailed below.
+* `secrets_manager_access_role_arn` - (Optional) Amazon Resource Name (ARN) of the IAM role that specifies AWS DMS as the trusted entity and has the required permissions to access the value in SecretsManagerSecret.
+* `secrets_manager_arn` - (Optional) The full ARN, partial ARN, or friendly name of the SecretsManagerSecret that contains the endpoint connection details. Supported only for `engine_name` as `oracle` and `postgres`.
 * `server_name` - (Optional) The host name of the server.
 * `service_access_role` - (Optional) The Amazon Resource Name (ARN) used by the service access IAM role for dynamodb endpoints.
 * `ssl_mode` - (Optional, Default: none) The SSL mode to use for the connection. Can be one of `none | require | verify-ca | verify-full`
@@ -111,7 +113,13 @@ The `kafka_settings` configuration block supports the following arguments:
 
 The `kinesis_settings` configuration block supports the following arguments:
 
+* `include_control_details` - (Optional) Shows detailed control information for table definition, column definition, and table and column changes in the Kinesis message output. The default is `false`.
+* `include_null_and_empty` - (Optional) Include NULL and empty columns in the target. The default is `false`.
+* `include_partition_value` - (Optional) Shows the partition value within the Kinesis message output, unless the partition type is schema-table-type. The default is `false`.
+* `include_table_alter_operations` - (Optional) Includes any data definition language (DDL) operations that change the table in the control data. The default is `false`.
+* `include_transaction_details` - (Optional) Provides detailed transaction information from the source database. The default is `false`.
 * `message_format` - (Optional) Output format for the records created. Defaults to `json`. Valid values are `json` and `json_unformatted` (a single line with no tab).
+* `partition_include_schema_table` - (Optional) Prefixes schema and table names to partition values, when the partition type is primary-key-type. The default is `false`.
 * `service_access_role_arn` - (Optional) Amazon Resource Name (ARN) of the IAM Role with permissions to write to the Kinesis data stream.
 * `stream_arn` - (Optional) Amazon Resource Name (ARN) of the Kinesis data stream.
 
@@ -134,7 +142,7 @@ The `mongodb_settings` configuration block supports the following arguments:
 
 The `s3_settings` configuration block supports the following arguments:
 
-* `bucket_folder` - (Optional) S3 Bucket Object prefix.
+* `bucket_folder` - (Optional) S3 Object prefix.
 * `bucket_name` - (Optional) S3 Bucket name.
 * `compression_type` - (Optional) Set to compress target files. Defaults to `NONE`. Valid values are `GZIP` and `NONE`.
 * `csv_delimiter` - (Optional) Delimiter used to separate columns in the source files. Defaults to `,`.
